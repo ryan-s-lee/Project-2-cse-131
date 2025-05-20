@@ -51,7 +51,6 @@ public class MipsInstrCall extends MipsInstr {
         }
 
         // only syscalls have numbers as names
-        System.err.printf("Called function: %s; intrinsic: %s\n", this.callee.name, intrinsicToDescriptorMap.get(this.callee.name));
         if (intrinsicToDescriptorMap.containsKey(this.callee.name)) {  // pray that no function uses a number as their name
             System.out.printf("\taddi $v0, $zero, %d\n", intrinsicToDescriptorMap.get(this.callee.name));  // TODO
             System.out.printf("\tsyscall\n");

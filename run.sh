@@ -14,3 +14,5 @@
 # Produces out . s
 # run.sh path/to/file.ir --greedy
 # Produces out . s
+
+java -cp build test.TestMain $1 $2 > out.s
