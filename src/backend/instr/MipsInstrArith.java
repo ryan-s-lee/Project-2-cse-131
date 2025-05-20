@@ -2,9 +2,6 @@ package backend.instr;
 
 import backend.operand.MipsImmOp;
 import backend.operand.MipsReg;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 
 public class MipsInstrArith extends MipsInstr {
 
@@ -88,23 +85,23 @@ public class MipsInstrArith extends MipsInstr {
                 );
                 break;
             case SUB:
-            System.out.printf(
-                "\t%s %s, %s, %s\n",
-                (itype ? "addi" : "sub"),
-                dest,
-                rs,
-                itype ? -immediate.getVal() : rt
-            );
-            break;
+                System.out.printf(
+                    "\t%s %s, %s, %s\n",
+                    (itype ? "addi" : "sub"),
+                    dest,
+                    rs,
+                    itype ? -immediate.getVal() : rt
+                );
+                break;
             case SLL:
-            System.out.printf(
-                "\t%s %s, %s, %s\n",
-                op.toString(),
-                dest,
-                rs,
-                immediate
-            );
-            break;
+                System.out.printf(
+                    "\t%s %s, %s, %s\n",
+                    op.toString(),
+                    dest,
+                    rs,
+                    immediate
+                );
+                break;
         }
     }
 
@@ -114,16 +111,30 @@ public class MipsInstrArith extends MipsInstr {
     }
 
     @Override
-    public Set<MipsReg> getInRegOps() {
+    public MipsReg[] getInRegOps() {
         if (itype) {
-            return new HashSet<>(Arrays.asList(rs));
+            return new MipsReg[] { rs };
         } else {
-            return new HashSet<>(Arrays.asList(rs, rt));
+            return new MipsReg[] { rs, rt };
         }
     }
 
     @Override
-    public Set<MipsReg> getOutRegOps() {
-        return new HashSet<>(Arrays.asList(dest));
+    public MipsReg getOutRegOp() {
+        return dest;
+    }
+
+    @Override
+    public MipsInstr regAllocTrans() {
+        return regAllocTrans(MipsReg.T0, MipsReg.T1, MipsReg.T2);
+    }
+
+    @Override
+    public MipsInstr regAllocTrans(MipsReg... newRegs) {
+        if (itype) {
+            return new MipsInstrArith(op, dest.isSymbolic() ? newRegs[0] : dest, rs.isSymbolic() ? newRegs[1] : rs, immediate);
+        } else {
+            return new MipsInstrArith(op, dest.isSymbolic() ? newRegs[0] : dest, rs.isSymbolic() ? newRegs[1] : rs, rt.isSymbolic() ? newRegs[2] : rt);
+        }
     }
 }

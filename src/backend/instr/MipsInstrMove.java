@@ -2,9 +2,6 @@ package backend.instr;
 
 import backend.operand.MipsImmOp;
 import backend.operand.MipsReg;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 
 public class MipsInstrMove extends MipsInstr {
 
@@ -42,16 +39,30 @@ public class MipsInstrMove extends MipsInstr {
     }
 
     @Override
-    public Set<MipsReg> getInRegOps() {
+    public MipsReg[] getInRegOps() {
         if (imm == null) {
-            return new HashSet<>(Arrays.asList(rs));
+            return new MipsReg[]{rs};
         } else {
-            return new HashSet<>();
+            return new MipsReg[0];
         }
     }
 
     @Override
-    public Set<MipsReg> getOutRegOps() {
-        return new HashSet<>(Arrays.asList(dest));
+    public MipsReg getOutRegOp() {
+        return dest;
+    }
+
+    @Override
+    public MipsInstr regAllocTrans() {
+        return regAllocTrans(MipsReg.T0, MipsReg.T1);
+    }
+
+    @Override
+    public MipsInstr regAllocTrans(MipsReg... newRegs) {
+        if (imm == null) {
+            return new MipsInstrMove(dest.isSymbolic() ? newRegs[0] : dest, rs.isSymbolic() ? newRegs[1] : rs);
+        } else {
+            return new MipsInstrMove(dest.isSymbolic() ? newRegs[0] : dest, imm);
+        }
     }
 }

@@ -30,17 +30,27 @@ public class MipsLabel extends MipsInstr {
     }
 
     @Override
-    public Set<MipsReg> getInRegOps() {
-        return new HashSet<>();
+    public MipsReg[] getInRegOps() {
+        return new MipsReg[0];
     }
 
     @Override
-    public Set<MipsReg> getOutRegOps() {
-        return new HashSet<>();
+    public MipsReg getOutRegOp() {
+        return null;
     }
 
     static Map<String, MipsLabel> cache = new HashMap<>();
     public static MipsLabel of(String string) {
         return cache.computeIfAbsent(string, e -> new MipsLabel(string));
+    }
+
+    @Override
+    public MipsInstr regAllocTrans() {
+        return this;
+    }
+
+    @Override
+    public MipsInstr regAllocTrans(MipsReg... newRegs) {
+        return this;
     }
 }

@@ -4,31 +4,31 @@ import backend.instr.MipsInstr;
 import backend.operand.MipsImmOp;
 import backend.operand.MipsLabel;
 import backend.operand.MipsReg;
-import backend.operand.MipsReg.Type;
+import backend.util.BackendUtils;
 import backend.util.IrInstrToMipsInstr;
 import ir.IRFunction;
 import ir.IRInstruction;
+import ir.IRInstruction.OpCode;
 import ir.datatype.IRArrayType;
 import ir.operand.IRLabelOperand;
 import ir.operand.IRVariableOperand;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public class MipsFunction {
 
+    // TODO: consider making these intrinsics utilized all saved and all temp registers. For safety.
     public static Map<String, MipsFunction> intrinsics = Map.of(
-        "geti",
-        new MipsFunction("geti", List.of()),
-        "getc",
-        new MipsFunction("getc", List.of()),
         "puti",
-        new MipsFunction("geti", List.of(new MipsReg("puti_in"))),
+        new MipsFunction("puti", List.of(new MipsReg("puti_in")), new ArrayList<>(), new ArrayList<>()),
+        "geti",
+        new MipsFunction("geti", List.of(), new ArrayList<>(), new ArrayList<>()),
         "putc",
-        new MipsFunction("getc", List.of(new MipsReg("putc_in")))
+        new MipsFunction("putc", List.of(new MipsReg("putc_in")), new ArrayList<>(), new ArrayList<>()),
+        "getc",
+        new MipsFunction("getc", List.of(), new ArrayList<>(), new ArrayList<>())
     );
 
     IRFunction sourceIr;
@@ -44,8 +44,8 @@ public class MipsFunction {
     public List<MipsInstr> instrs;
 
     // post-register allocation
-    List<MipsReg> usedSavedRegs;
-    List<MipsReg> usedTempRegs;
+    public List<MipsReg> usedSavedRegs;
+    public List<MipsReg> usedTempRegs;
     Map<MipsReg, MipsReg> symbolicToArchReg;
     public Map<IRLabelOperand, MipsLabel> irToMipsLabel;
     public Map<MipsReg, MipsImmOp> symbolToStackOff;
@@ -53,9 +53,11 @@ public class MipsFunction {
     boolean intrinsic;
 
     // for intrinsics
-    private MipsFunction(String name, List<MipsReg> parameters) {
+    private MipsFunction(String name, List<MipsReg> parameters, List<MipsReg> savedVars, List<MipsReg> tempVars) {
         this.name = name;
         this.parameters = parameters;
+        this.usedSavedRegs = savedVars;
+        this.usedTempRegs = tempVars;
         this.intrinsic = true;
     }
 
@@ -102,10 +104,21 @@ public class MipsFunction {
         instrs = new ArrayList<>();
         irToMipsLabel = new HashMap<>();
         // current method of stack allocation is a hack
-        this.symbolToStackOff = this.allocateStackPositions();
+        // appendTranslation needs an initial mapping of variables to MipsImmOp, which will then be updated during instruction selection
+        for (MipsReg param : parameters) {
+            symbolToStackOff.put(param, new MipsImmOp(0));
+        }
+        for (MipsReg var : variables) {
+            symbolToStackOff.put(var, new MipsImmOp(0));
+        }
         for (IRInstruction iri : sourceIr.instructions) {
             IrInstrToMipsInstr.appendTranslation(iri, this, allFuncs);
+            if (iri.opCode == OpCode.CALL || iri.opCode == OpCode.CALLR) {
+                usesCall = true;
+            }
         }
+
+        this.allocateStackPositions(this.symbolToStackOff);
     }
 
     public int getStackSize() {
@@ -122,15 +135,14 @@ public class MipsFunction {
     }
 
     // we have guaranteed less than 4 arguments, and we have to reserve stack space for them anyway.
-    // 8 saved regs, then the ra and fp
-    final int SAVEDREGSECTIONSIZE = 16 + 4 * 8 + 4 + 4;
+    // 8 saved regs, 10 temp regs, then the ra and fp
+    final int SAVEDREGSECTIONSIZE = 16 + 4 * 8 + 4 * 10 + 4 + 4;
 
-    Map<MipsReg, MipsImmOp> allocateStackPositions() {
+    void allocateStackPositions(Map<MipsReg, MipsImmOp> spMap) {
         final int sfSize = getStackSize();
-        Map<MipsReg, MipsImmOp> result = new HashMap<>();
         int i = 0;
         for (MipsReg param : parameters) {
-            result.put(param, MipsImmOp.of(sfSize + i));
+            spMap.get(param).setVal(sfSize + i);
             i += param.getSize();
             // worth checking
             if (param.getSize() != 4) {
@@ -156,16 +168,48 @@ public class MipsFunction {
                     )
                 );
             }
-            result.put(variable, MipsImmOp.of(sfSize - i));
+            spMap.get(variable).setVal(sfSize - i);
         }
 
         // saved regs like $ra and $s0 have implicit positions on the stack
-        return result;
     }
 
     public void printPrologue() {
-        System.out.println(name + ":");
         // TODO
+        // push saved variables to the stack
+        System.out.println(name + ":");
+        int i = 0;
+        for (MipsReg possibleSaved : MipsReg.S) {
+            int savePos = 4 * i + 16;
+            if (
+                this.usedSavedRegs != null &&
+                this.usedSavedRegs.contains(possibleSaved)
+            ) {
+                System.out.printf(
+                    "\tsw %s, %d(%s)\n",
+                    possibleSaved,
+                    savePos,
+                    MipsReg.SP
+                );
+            }
+            i += 1;
+        }
+        // if a function call is made in the procedure, also push ra to the stack
+        if (usesCall) {
+            int savePos = SAVEDREGSECTIONSIZE - 8;
+            System.out.printf(
+                "\tsw %s, %d(%s)\n",
+                MipsReg.FP,
+                savePos,
+                MipsReg.SP
+            );
+            System.out.printf(
+                "\tsw %s, %d(%s)\n",
+                MipsReg.RA,
+                savePos + 4,
+                MipsReg.SP
+            );
+        }
     }
 
     public void printBody() {
@@ -174,8 +218,52 @@ public class MipsFunction {
         }
     }
 
+    public void printNaiveAllocation() {
+        printPrologue();
+        for (MipsInstr instr : BackendUtils.NaiveRegAlloc(this)) {
+            instr.printMipsRepresentation();
+        }
+        printEpilogue();
+    }
+
     public void printEpilogue() {
         // TODO
+        // if a function call was made in the procedure, pop ra from the stack
+        // pop saved variables to the stack
+        System.out.printf("%s_epilogue:\n", this.name);
+        if (usesCall) {
+            int savePos = SAVEDREGSECTIONSIZE - 8;
+            System.out.printf(
+                "\tsw %s, %d(%s)\n",
+                MipsReg.RA,
+                savePos + 4,
+                MipsReg.SP
+            );
+            System.out.printf(
+                "\tsw %s, %d(%s)\n",
+                MipsReg.FP,
+                savePos,
+                MipsReg.SP
+            );
+        }
+
+        for (int j = 7; j >= 0; --j) {
+            MipsReg possibleSaved = MipsReg.S[j];
+            int savePos = 4 * j + 16;
+            if (
+                this.usedSavedRegs != null &&
+                this.usedSavedRegs.contains(possibleSaved)
+            ) {
+                System.out.printf(
+                    "\tsw %s, %d(%s)\n",
+                    possibleSaved,
+                    savePos,
+                    MipsReg.SP
+                );
+            }
+        }
+
+        System.out.print("\tjr $ra\n");
     }
 
     public void print() {

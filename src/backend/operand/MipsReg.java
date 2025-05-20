@@ -31,11 +31,13 @@ public class MipsReg {
     static public MipsReg S6 = new MipsReg("$s6", Type.SAVED);
     static public MipsReg S7 = new MipsReg("$s7", Type.SAVED);
     static public MipsReg RA = new MipsReg("$ra", Type.RET);
+    static public MipsReg FP = new MipsReg("$fp", Type.FP);
     static public MipsReg SP = new MipsReg("$sp", Type.SP);
 
     static public MipsReg[] A = {A0, A1, A2, A3};
     static public MipsReg[] V = {V0, V1};
     static public MipsReg[] T = {T0, T1, T2, T3, T4, T5, T6, T7, T8, T9};
+    static public MipsReg[] S = {S0, S1, S2, S3, S4, S5, S6, S7};
 
     public enum Type {
         SYMBOLIC,
@@ -46,6 +48,7 @@ public class MipsReg {
         SAVED,
         ARG,
         RET,
+        FP,
         SP;
     }
 

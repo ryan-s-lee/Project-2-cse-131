@@ -12,7 +12,6 @@ import backend.instr.MipsInstrMem;
 import backend.instr.MipsInstrMove;
 import backend.operand.MipsImmOp;
 import backend.operand.MipsLabel;
-import backend.operand.MipsOp;
 import backend.operand.MipsReg;
 import backend.operand.MipsReg.Type;
 import ir.IRInstruction;
@@ -24,9 +23,7 @@ import ir.operand.IRLabelOperand;
 import ir.operand.IROperand;
 import ir.operand.IRVariableOperand;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.IntStream;
 
 public class IrInstrToMipsInstr {
 
@@ -147,9 +144,10 @@ public class IrInstrToMipsInstr {
         // # else if array is an actual array:
         // lui $temp, $temp, $arrayUpper
         // or $temp, $temp, $arrayLower
+        throw new UnsupportedOperationException("Unimplemented method 'tAssignArr'");
     }
 
-    private static void tArith(
+	private static void tArith(
         IRInstruction iri,
         MipsFunction owner,
         Op operation
@@ -300,7 +298,7 @@ public class IrInstrToMipsInstr {
         if (regs.length == 1) {
             owner.instrs.add(new MipsInstrMove(MipsReg.V0, regs[0]));
             owner.instrs.add(
-                new MipsInstrJumpLabel(new MipsLabel(owner.name + "_epilogue"))
+                new MipsInstrJumpLabel(MipsLabel.of(owner.name + "_epilogue"))
             );
         } else {
             throw new RuntimeException("Unexpected operands");
@@ -488,6 +486,7 @@ public class IrInstrToMipsInstr {
         final String tempRegPrefix = "X";
         MipsReg newReg = new MipsReg(tempRegPrefix + nextTempIdx++);
         owner.variables.add(newReg);
+        owner.symbolToStackOff.put(newReg, new MipsImmOp(0));
         return newReg;
     }
 

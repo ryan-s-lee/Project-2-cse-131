@@ -27,4 +27,10 @@ public class MipsImmOp {
     }
 
     public short getVal() { return immediate; }
+    public void setVal(int immediate) {
+        if (immediate < Short.MIN_VALUE || immediate > Short.MAX_VALUE) {
+            throw new RuntimeException("Passed immediate to instruction that was too large");
+        }
+        this.immediate = (short)immediate;
+    }
 }

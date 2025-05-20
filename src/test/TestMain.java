@@ -12,6 +12,10 @@ public class TestMain {
         IRProgram program = irReader.parseIRFile(args[0]);
 
         MipsProgram mipsprogram = new MipsProgram(program);
-        mipsprogram.print();
+        if (args.length >= 2 && args[1].equals("n")) {
+            mipsprogram.printNaive();
+        } else {
+            mipsprogram.print();
+        }
     }
 }

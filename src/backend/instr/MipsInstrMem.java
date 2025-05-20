@@ -3,10 +3,6 @@ package backend.instr;
 import backend.operand.MipsImmOp;
 import backend.operand.MipsReg;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
-
 public class MipsInstrMem extends MipsInstr {
 
     public enum Op {
@@ -53,26 +49,36 @@ public class MipsInstrMem extends MipsInstr {
     }
 
     @Override
-    public Set<MipsReg> getInRegOps() {
+    public MipsReg[] getInRegOps() {
         switch (op) {
             case LW:
-                return new HashSet<>(Arrays.asList(regWhence));
+                return new MipsReg[]{regData};
             case SW:
-                return new HashSet<>(Arrays.asList(regWhence, regData));
+                return new MipsReg[]{regData, regWhence};
             default:  // should never happen
-                return new HashSet<>(Arrays.asList(regWhence, regData));
+                return new MipsReg[]{regData, regWhence};
         }
     }
 
     @Override
-    public Set<MipsReg> getOutRegOps() {
+    public MipsReg getOutRegOp() {
         switch (op) {
             case LW:
-                return new HashSet<>(Arrays.asList(regData));
+                return  regData;
             case SW:
-                return new HashSet<>();
+                return null;
             default:  // should never happen
-                return new HashSet<>();
+                return null;
         }
+    }
+
+    @Override
+    public MipsInstr regAllocTrans() {
+        return regAllocTrans(MipsReg.T0, MipsReg.T1);
+    }
+
+    @Override
+    public MipsInstr regAllocTrans(MipsReg... newRegs) {
+        return new MipsInstrMem(regData.isSymbolic() ? newRegs[0] : regData, regWhence.isSymbolic() ? newRegs[1] : regWhence, offset, op);
     }
 }
