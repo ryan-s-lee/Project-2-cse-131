@@ -130,27 +130,83 @@ public class IrInstrToMipsInstr {
         owner.instrs.addAll(translation);
     }
 
+    private static int counter = 0;
     private static void tAssignArr(IRInstruction iri, MipsFunction owner) {
         // TODO
         //
         // generate an inline function! that loops over each element of the array.
         //
         // create a new symbolic register to be an iterator over this array
-        MipsReg tempReg = newTempReg(owner);
-
         List<MipsInstr> translation = new ArrayList<>();
-        // # load the position of the array into the iterating register
-        // # If array is a pointer:
-        // move $temp, $array
-        // # else if array is an actual array:
-        // li $temp, arrayImm
-        // create a fake node
-
         MipsReg[] regs = getRegs(iri, owner);
         Integer[] imms = getImms(iri, owner);
 
         MipsReg dest = regs[0]; // always expect there to be one destination register at the front
 
+        // # load the position of the array into the iterating register
+        // # If array is a pointer:
+        // move $itr, $array
+        // # else if array is an actual array:
+        // move $itr, $sp
+        // addi $itr, $itr, arrPos
+
+        MipsReg iterReg = newTempReg(owner);
+        if (dest.getType() == Type.SYMBOLICPTR || dest.getType() == Type.ARG) {
+            translation.add(new MipsInstrMove(iterReg, dest));
+        } else {
+            // compute array position
+            MipsImmOp arrPos = owner.symbolToStackOff.get(dest);
+            translation.add(new MipsInstrMove(iterReg, MipsReg.SP));
+            translation.add(new MipsInstrArith(Op.ADD, iterReg, iterReg, arrPos));
+        }
+        // have a second temporary hold the stopping bytearray offset from op2
+        // sll $stop, $op2, 2     OR     li $stop, op2imm*4
+        MipsReg stopReg = newTempReg(owner);
+
+        if (iri.operands[1] instanceof IRConstantOperand) {
+            // immediate
+            MipsImmOp stopImm = MipsImmOp.of(Integer.valueOf(((IRConstantOperand)iri.operands[1]).getValueString()) * 4);
+            translation.add(new MipsInstrMove(stopReg, iterReg));
+            translation.add(new MipsInstrArith(Op.ADD, stopReg, stopReg, stopImm));
+        } else {
+            MipsReg op2 = owner.irVarToMipsReg((IRVariableOperand)iri.operands[1]);
+            translation.add(new MipsInstrArith(Op.SLL, stopReg, op2, MipsImmOp.of(2)));
+            translation.add(new MipsInstrArith(Op.ADD, stopReg, stopReg, iterReg));
+        }
+
+        // If op1 is an immediate, have a *third* temporary reg hold the fill value.
+        // because MIPS doesn't let you store registers.
+        // Otherwise, use the passed-in register.
+        // li $fill, fillImm
+        MipsReg fillReg;
+        if (iri.operands[2] instanceof IRConstantOperand) {
+            // immediate
+            MipsImmOp fillImm = MipsImmOp.of(Integer.valueOf(((IRConstantOperand)iri.operands[2]).getValueString()));
+            fillReg = newTempReg(owner);
+            translation.add(new MipsInstrMove(fillReg, fillImm));
+        } else {
+            MipsReg op3 = owner.irVarToMipsReg((IRVariableOperand)iri.operands[2]);
+            fillReg = op3;
+        }
+        // add a label to signify the start of the loop
+        MipsLabel loopStart = new MipsLabel(owner.name + "_asgn_loopstart" + counter);
+        MipsLabel loopEnd = new MipsLabel(owner.name + "_asgn_loopend" + counter);
+        counter += 1;
+        translation.add(loopStart);
+        // have a branch to check if $temp >= $stop; if so, pass over the loop.
+        translation.add(new MipsInstrBranch(Cmp.BGE, iterReg, stopReg, loopEnd));
+
+        // remaining code should look pretty similar to the single element version
+        // sw $fill, 0($itr)
+        // addi $itr, $itr, 4
+        // goto loopStart
+        // loopEnd:
+        translation.add(new MipsInstrMem(fillReg, iterReg, MipsImmOp.of(0), MipsInstrMem.Op.SW));
+        translation.add(new MipsInstrArith(Op.ADD, iterReg, iterReg, MipsImmOp.of(4)));
+        translation.add(new MipsInstrJumpLabel(loopStart));
+        translation.add(loopEnd);
+
+        owner.instrs.addAll(translation);
     }
 
 	private static void tArith(

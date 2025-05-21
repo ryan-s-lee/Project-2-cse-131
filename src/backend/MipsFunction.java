@@ -164,12 +164,13 @@ public class MipsFunction {
         int frameSize = SAVEDREGSECTIONSIZE + localVarSection;
         if (frameSize % 8 != 0) frameSize = 8 * (frameSize / 8) + 8;
 
-        return frameSize;
+        return frameSize + TOPPAD;
     }
 
     // we have guaranteed less than 4 arguments, and we have to reserve stack space for them anyway.
     // 8 saved regs, 10 temp regs, then the ra and fp
     final int SAVEDREGSECTIONSIZE = 16 + 4 * 8 + 4 * 10 + 4 + 4;
+    final int TOPPAD = 8;
 
     void allocateStackPositions(Map<MipsReg, MipsImmOp> spMap) {
         final int sfSize = getStackSize();
@@ -202,7 +203,7 @@ public class MipsFunction {
                     )
                 );
             }
-            spMap.get(variable).setVal(sfSize - i);
+            spMap.get(variable).setVal(sfSize - i - TOPPAD);
         }
 
         // saved regs like $ra and $s0 have implicit positions on the stack

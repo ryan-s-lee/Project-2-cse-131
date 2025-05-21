@@ -1,0 +1,14 @@
+#start_function
+void main():
+int-list: A[100], x, y
+float-list:
+    assign, A, 100, 10
+    assign, x, 0
+loop0:
+    array_load, y, A, x
+    add, x, x, 1
+    call, puti, y
+    call, putc, 10
+    brneq, loop0, x, 100
+end:
+#end_function

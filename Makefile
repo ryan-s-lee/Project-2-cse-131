@@ -6,8 +6,8 @@ build:
 	./build.sh
 
 test:
-	./run.sh ./public_test_cases/prime/prime.ir --naive
+	./run.sh ./public_test_cases/quicksort/quicksort.ir --naive
 	# ./run.sh ./public_test_cases/quicksort/quicksort.ir --symbolic
 
 spim:
-	spim -keepstats -f out.s < ./public_test_cases/prime/9.in
+	spim -keepstats -f out.s < ./public_test_cases/quicksort/5.in
