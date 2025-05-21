@@ -180,8 +180,10 @@ divisible:
 	lw $t2, 100($sp)
 	bne $a0, $t2, divisible_label0
 	addi $v0, $zero, 1
+	j divisible_epilogue
 divisible_label0:
 	addi $v0, $zero, 0
+	j divisible_epilogue
 divisible_epilogue:
 	addi $sp, $sp, 104
 	jr $ra

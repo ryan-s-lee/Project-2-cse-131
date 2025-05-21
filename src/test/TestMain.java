@@ -20,6 +20,8 @@ public class TestMain {
             mipsprogram.printNaive();
         } else if (args.length >= 2 && args[1].equals("--symbolic")) {
             mipsprogram.print();
+        } else if (args.length >= 2 && args[1].equals("--greedy")) {
+            mipsprogram.printGreedy();
         } else {
             mipsprogram.print();
         }

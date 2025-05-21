@@ -301,9 +301,6 @@ public class IrInstrToMipsInstr {
         Integer[] imms = getImms(iri, owner);
         if (regs.length == 1) {
             owner.instrs.add(new MipsInstrMove(MipsReg.V0, regs[0]));
-            owner.instrs.add(
-                new MipsInstrJumpLabel(MipsLabel.of(owner.name + "_epilogue"))
-            );
         } else if (imms.length == 1) {
             owner.instrs.add(new MipsInstrMove(MipsReg.V0, MipsImmOp.of(imms[0])));
         } else {
@@ -314,6 +311,9 @@ public class IrInstrToMipsInstr {
             System.err.printf("operand 1: %s\n", iri.operands[1]);
             throw new RuntimeException("Unexpected operands");
         }
+        owner.instrs.add(
+            new MipsInstrJumpLabel(MipsLabel.of(owner.name + "_epilogue"))
+        );
     }
 
     private static void tCall(

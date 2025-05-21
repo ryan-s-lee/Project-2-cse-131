@@ -39,7 +39,32 @@ public class MipsProgram {
             function.usedSavedRegs = new ArrayList<>();
         }
 
-        // first print function.
+        // first print main
+        for (MipsFunction function : functions) {
+            if (function.name.equals("main")) {
+                function.printNaiveAllocation();
+                System.out.println();
+            }
+        }
+        for (MipsFunction function : functions) {
+            if (!function.name.equals("main")) {
+                function.printNaiveAllocation();
+                System.out.println();
+            }
+        }
+    }
+
+    public void printGreedy() {
+        System.out.println(".globl main\n");
+        System.out.println(".text\n");
+
+        for (MipsFunction function : functions) {
+            // mark functions as naively allocated by assigning temp/saved regs
+            function.usedTempRegs = new ArrayList<>();
+            function.usedSavedRegs = new ArrayList<>();
+        }
+
+        // first print main
         for (MipsFunction function : functions) {
             if (function.name.equals("main")) {
                 function.printNaiveAllocation();
