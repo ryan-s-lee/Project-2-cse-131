@@ -10,4 +10,4 @@ test:
 	# ./run.sh ./public_test_cases/quicksort/quicksort.ir --symbolic
 
 spim:
-	spim -keepstats -f out1.s < ./public_test_cases/quicksort/0.in
+	spim -keepstats -f out.s < ./public_test_cases/quicksort/0.in

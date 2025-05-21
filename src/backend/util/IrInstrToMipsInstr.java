@@ -206,21 +206,23 @@ public class IrInstrToMipsInstr {
             // right now it is easier to always use two instructions.
             // However, we can save an instruction in the case that an immediate version
             // of the operation exists.
+            // Also gotta watch out for when dest == rs!
             // if (imm > Short.MAX_VALUE) {
-                translation.add(new MipsInstrMove(dest, MipsImmOp.of(imm)));
+            MipsReg tempReg = newTempReg(owner);
+                translation.add(new MipsInstrMove(tempReg, MipsImmOp.of(imm)));
                 translation.add(
                     new MipsInstrArith(
                         operation,
                         dest,
-                        dest,
-                        rs
+                        rs,
+                        tempReg
                     )
                 );
             // }
             // else {
-            //     translation.add(
-            //         new MipsInstrArith(operation, dest, rs, MipsImmOp.of(imm))
-            //     );
+            // translation.add(
+            //     new MipsInstrArith(operation, dest, rs, MipsImmOp.of(imm))
+            // );
             // }
         } else if (numImmediate == 0 && regs.length == 3) {
             translation.add(
@@ -337,7 +339,7 @@ public class IrInstrToMipsInstr {
         int minArgs = Math.min(owner.parameters.size(), calledFunc.parameters.size());
         for (int i = 0; i < minArgs; i++) {
             MipsReg ownerArg = owner.parameters.get(i);
-            translation.add(new MipsInstrMem(ownerArg, MipsReg.SP, owner.symbolToStackOff.get(ownerArg), MipsInstrMem.Op.SW));
+            translation.add(new MipsInstrMem(MipsReg.A[i], MipsReg.SP, owner.symbolToStackOff.get(ownerArg), MipsInstrMem.Op.SW));
         }
 
         // Move the passed arguments to $a0-$a3
@@ -347,19 +349,20 @@ public class IrInstrToMipsInstr {
         // These immediates will be initialized to 0, but should eventually updated with their appropriate stack positions.
         int callArgStart = targetOpIdx + 1;
         for (int i = callArgStart; i < iri.operands.length; i++) {
-
+            int aRegIdx = i - callArgStart;
             IROperand irop = iri.operands[i];
             if (irop instanceof IRConstantOperand) {
                 IRConstantOperand ircop = (IRConstantOperand) irop;
-                translation.add(new MipsInstrMove(MipsReg.A[i], MipsImmOp.of(Integer.valueOf(ircop.getValueString()))));
+                translation.add(new MipsInstrMove(MipsReg.A[aRegIdx], MipsImmOp.of(Integer.valueOf(ircop.getValueString()))));
             } else if (irop instanceof IRVariableOperand) {
                 IRVariableOperand irvop = (IRVariableOperand) irop;
                 MipsReg argumentReg = owner.irVarToMipsReg(irvop);
+
                 if (argumentReg.getType() == Type.SYMBOLICARR) {
-                    translation.add(new MipsInstrMove(MipsReg.A[i], MipsReg.SP));
-                    translation.add(new MipsInstrArith(Op.ADD, MipsReg.A[i], MipsReg.A[i], owner.symbolToStackOff.get(argumentReg)));
+                    translation.add(new MipsInstrMove(MipsReg.A[aRegIdx], MipsReg.SP));
+                    translation.add(new MipsInstrArith(Op.ADD, MipsReg.A[aRegIdx], MipsReg.A[aRegIdx], owner.symbolToStackOff.get(argumentReg)));
                 } else {
-                    translation.add(new MipsInstrMove(MipsReg.A[i], argumentReg));
+                    translation.add(new MipsInstrMove(MipsReg.A[aRegIdx], argumentReg));
                 }
             }
         }
@@ -388,7 +391,7 @@ public class IrInstrToMipsInstr {
         // restore arguments
         for (int i = 0; i < minArgs; i++) {
             MipsReg ownerArg = owner.parameters.get(i);
-            translation.add(new MipsInstrMem(ownerArg, MipsReg.SP, owner.symbolToStackOff.get(ownerArg), MipsInstrMem.Op.LW));
+            translation.add(new MipsInstrMem(MipsReg.A[i], MipsReg.SP, owner.symbolToStackOff.get(ownerArg), MipsInstrMem.Op.LW));
         }
 
         owner.instrs.addAll(translation);
@@ -439,10 +442,12 @@ public class IrInstrToMipsInstr {
         List<MipsInstr> translation = new ArrayList<>();
         backend.instr.MipsInstrMem.Op op = (iri.opCode == OpCode.ARRAY_LOAD ? backend.instr.MipsInstrMem.Op.LW : MipsInstrMem.Op.SW);
 
-        if (arrayReg.getType() == Type.SYMBOLICPTR && offOp instanceof IRConstantOperand) {
+        boolean regIsPtr =  arrayReg.getType() == Type.SYMBOLICPTR || arrayReg.getType() == Type.ARG;
+
+        if (regIsPtr && offOp instanceof IRConstantOperand) {
             int imm = Integer.valueOf(((IRConstantOperand)offOp).getValueString()) << 2;
             translation.add(new MipsInstrMem(regData, arrayReg, MipsImmOp.of(imm), op));
-        } else if (arrayReg.getType() == Type.SYMBOLICPTR && offOp instanceof IRVariableOperand) {
+        } else if (regIsPtr && offOp instanceof IRVariableOperand) {
             MipsReg offReg = owner.irVarToMipsReg((IRVariableOperand)offOp);
             MipsReg byteOffReg;
             if (op == MipsInstrMem.Op.SW) byteOffReg = newTempReg(owner); else byteOffReg = regData;
@@ -474,7 +479,7 @@ public class IrInstrToMipsInstr {
             translation.add(new MipsInstrMove(arrPosReg, MipsReg.SP));
             translation.add(new MipsInstrArith(Op.ADD, arrPosReg, arrPosReg, arrOffsetImm));
             translation.add(new MipsInstrArith(Op.SLL, byteOffsetReg, offsetReg, MipsImmOp.of(2)));
-            translation.add(new MipsInstrArith(Op.ADD, arrPosReg, arrPosReg, offsetReg));
+            translation.add(new MipsInstrArith(Op.ADD, arrPosReg, arrPosReg, byteOffsetReg));
             translation.add(new MipsInstrMem(regData, arrPosReg, MipsImmOp.of(0), op));
         } else {
             throw new RuntimeException("Unexpectedly, array register was not a pointer or array");

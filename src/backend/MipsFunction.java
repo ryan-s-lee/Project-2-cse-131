@@ -13,22 +13,46 @@ import ir.datatype.IRArrayType;
 import ir.operand.IRLabelOperand;
 import ir.operand.IRVariableOperand;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Stream;
 
 public class MipsFunction {
 
     // TODO: consider making these intrinsics utilized all saved and all temp registers. For safety.
     public static Map<String, MipsFunction> intrinsics = Map.of(
         "puti",
-        new MipsFunction("puti", List.of(new MipsReg("puti_in")), new ArrayList<>(), new ArrayList<>()),
+        new MipsFunction(
+            "puti",
+            List.of(new MipsReg("puti_in")),
+            new ArrayList<>(),
+            new ArrayList<>()
+        ),
         "geti",
-        new MipsFunction("geti", List.of(), new ArrayList<>(), new ArrayList<>()),
+        new MipsFunction(
+            "geti",
+            List.of(),
+            new ArrayList<>(),
+            new ArrayList<>()
+        ),
         "putc",
-        new MipsFunction("putc", List.of(new MipsReg("putc_in")), new ArrayList<>(), new ArrayList<>()),
+        new MipsFunction(
+            "putc",
+            List.of(new MipsReg("putc_in")),
+            new ArrayList<>(),
+            new ArrayList<>()
+        ),
         "getc",
-        new MipsFunction("getc", List.of(), new ArrayList<>(), new ArrayList<>())
+        new MipsFunction(
+            "getc",
+            List.of(),
+            new ArrayList<>(),
+            new ArrayList<>()
+        )
     );
 
     IRFunction sourceIr;
@@ -53,7 +77,12 @@ public class MipsFunction {
     boolean intrinsic;
 
     // for intrinsics
-    private MipsFunction(String name, List<MipsReg> parameters, List<MipsReg> savedVars, List<MipsReg> tempVars) {
+    private MipsFunction(
+        String name,
+        List<MipsReg> parameters,
+        List<MipsReg> savedVars,
+        List<MipsReg> tempVars
+    ) {
         this.name = name;
         this.parameters = parameters;
         this.usedSavedRegs = savedVars;
@@ -79,15 +108,19 @@ public class MipsFunction {
         this.usedTempRegs = null; // can only be populated after register allocation
         this.symbolicToArchReg = null; // can only be populated after register allocation
 
+        Set<String> seenVariables = new HashSet<>();
         for (IRVariableOperand irfp : irf.parameters) {
             MipsReg newReg = irfp.type instanceof IRArrayType
                 ? new MipsReg(irfp.getName(), false, 4) // this 4 is ignored lol
                 : new MipsReg(irfp.getName());
             irToMipsReg.put(irfp.getName(), newReg);
             parameters.add(newReg);
+            seenVariables.add(irfp.getName());
         }
 
         for (IRVariableOperand irfv : irf.variables) {
+            if (seenVariables.contains(irfv.getName())) continue;
+
             MipsReg newReg = irfv.type instanceof IRArrayType
                 ? new MipsReg(
                     irfv.getName(),
@@ -158,6 +191,7 @@ public class MipsFunction {
 
         i = 0;
         for (MipsReg variable : variables) {
+            System.err.println("Mapping " + variable);
             i += variable.getSize();
             if (i > sfSize - SAVEDREGSECTIONSIZE) {
                 throw new RuntimeException(
@@ -172,12 +206,21 @@ public class MipsFunction {
         }
 
         // saved regs like $ra and $s0 have implicit positions on the stack
+        logStackMapping();
     }
 
     public void printPrologue() {
         // TODO
         // push saved variables to the stack
         System.out.println(name + ":");
+
+        // Shift stack pointer down
+        System.out.printf(
+            "\taddi %s, %s, %d\n",
+            MipsReg.SP,
+            MipsReg.SP,
+            -getStackSize()
+        );
         int i = 0;
         for (MipsReg possibleSaved : MipsReg.S) {
             int savePos = 4 * i + 16;
@@ -194,8 +237,9 @@ public class MipsFunction {
             }
             i += 1;
         }
-        // if a function call is made in the procedure, also push ra to the stack
-        if (usesCall) {
+        // if a function call is made in the procedure and the function is not main, also push ra to the stack
+        // main does not need to store caller stuff because it will syscall exit anyway.
+        if (usesCall && !name.equals("main")) {
             int savePos = SAVEDREGSECTIONSIZE - 8;
             System.out.printf(
                 "\tsw %s, %d(%s)\n",
@@ -231,16 +275,16 @@ public class MipsFunction {
         // if a function call was made in the procedure, pop ra from the stack
         // pop saved variables to the stack
         System.out.printf("%s_epilogue:\n", this.name);
-        if (usesCall) {
+        if (usesCall && !name.equals("main")) {
             int savePos = SAVEDREGSECTIONSIZE - 8;
             System.out.printf(
-                "\tsw %s, %d(%s)\n",
+                "\tlw %s, %d(%s)\n",
                 MipsReg.RA,
                 savePos + 4,
                 MipsReg.SP
             );
             System.out.printf(
-                "\tsw %s, %d(%s)\n",
+                "\tlw %s, %d(%s)\n",
                 MipsReg.FP,
                 savePos,
                 MipsReg.SP
@@ -255,7 +299,7 @@ public class MipsFunction {
                 this.usedSavedRegs.contains(possibleSaved)
             ) {
                 System.out.printf(
-                    "\tsw %s, %d(%s)\n",
+                    "\tlw %s, %d(%s)\n",
                     possibleSaved,
                     savePos,
                     MipsReg.SP
@@ -263,7 +307,35 @@ public class MipsFunction {
             }
         }
 
-        System.out.print("\tjr $ra\n");
+        // We have saved everything we needed from our current stack frame, so move stack back up
+        System.out.printf(
+            "\taddi %s, %s, %d\n",
+            MipsReg.SP,
+            MipsReg.SP,
+            getStackSize()
+        );
+
+        if (name.equals("main")) {
+            System.out.println("\tli $v0, 10");
+            System.out.println("\tsyscall");
+        } else {
+            System.out.print("\tjr $ra\n");
+        }
+    }
+
+    void logStackMapping() {
+        System.err.println(name + " Stack:");
+        symbolToStackOff
+            .entrySet()
+            .stream()
+            .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
+            .forEach(entry -> {
+                System.err.printf(
+                    "\t%s: %d\n",
+                    entry.getKey(),
+                    entry.getValue().getVal()
+                );
+            });
     }
 
     public void print() {
@@ -273,6 +345,12 @@ public class MipsFunction {
     }
 
     public MipsReg irVarToMipsReg(IRVariableOperand irvar) {
-        return irToMipsReg.get(irvar.getName());
+        MipsReg symbolic = irToMipsReg.get(irvar.getName());
+        int parameterPos = parameters.indexOf(symbolic);
+        if (parameterPos == -1) {
+            return symbolic;
+        } else {
+            return MipsReg.A[parameterPos];
+        }
     }
 }

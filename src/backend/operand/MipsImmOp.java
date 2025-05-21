@@ -3,7 +3,7 @@ package backend.operand;
 import java.util.HashMap;
 import java.util.Map;
 
-public class MipsImmOp {
+public class MipsImmOp implements Comparable<MipsImmOp>{
 
     short immediate;
 
@@ -32,5 +32,8 @@ public class MipsImmOp {
             throw new RuntimeException("Passed immediate to instruction that was too large");
         }
         this.immediate = (short)immediate;
+    }
+    public int compareTo(MipsImmOp other) {
+        return this.immediate - other.immediate;
     }
 }

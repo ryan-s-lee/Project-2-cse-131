@@ -452,7 +452,7 @@ public class MIPSInterpreter {
                         break;
                     case SBRK:
                         int n_bytes = readIntRegister("$a0");
-                        
+
                         // Return address to heap allocated buffer
                         writeRegister("$v0", next_heap_addr);
 
@@ -807,7 +807,7 @@ public class MIPSInterpreter {
         int word = regSet.get(name);
         ByteBuffer bytes = ByteBuffer.allocate(WORD_SIZE * 2);
         bytes.putInt(0, word);
-        
+
         word = regSet.get("$" + regLetter + (regNum + 1));
         bytes.putInt(WORD_SIZE, word);
         return bytes.getDouble();

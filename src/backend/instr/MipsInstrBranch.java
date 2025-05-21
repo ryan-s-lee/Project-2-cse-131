@@ -64,11 +64,11 @@ public class MipsInstrBranch extends MipsInstr {
 
     @Override
     public MipsInstr regAllocTrans() {
-        return regAllocTrans(MipsReg.T0, MipsReg.T1);
+        return regAllocTrans(MipsReg.T1, MipsReg.T2);
     }
 
     @Override
     public MipsInstr regAllocTrans(MipsReg... newRegs) {
-        return new MipsInstrBranch(comparator, newRegs[0], newRegs[1], target);
+        return new MipsInstrBranch(comparator, rs.isSymbolic() ? newRegs[0] : rs, rt.isSymbolic() ? newRegs[1] : rt, target);
     }
 }

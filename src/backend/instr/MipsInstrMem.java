@@ -74,7 +74,11 @@ public class MipsInstrMem extends MipsInstr {
 
     @Override
     public MipsInstr regAllocTrans() {
-        return regAllocTrans(MipsReg.T0, MipsReg.T1);
+        if (op == Op.SW) {
+            return regAllocTrans(MipsReg.T1, MipsReg.T2);
+        } else {  // LW
+            return regAllocTrans(MipsReg.T0, MipsReg.T1);
+        }
     }
 
     @Override
