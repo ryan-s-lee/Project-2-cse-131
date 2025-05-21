@@ -15,6 +15,7 @@ import backend.operand.MipsLabel;
 import backend.operand.MipsReg;
 import backend.operand.MipsReg.Type;
 import ir.IRInstruction;
+import ir.IRPrinter;
 import ir.IRInstruction.OpCode;
 import ir.datatype.IRIntType;
 import ir.operand.IRConstantOperand;
@@ -297,12 +298,20 @@ public class IrInstrToMipsInstr {
     private static void tReturn(IRInstruction iri, MipsFunction owner) {
         // return will always jump to a special label that precedes the epilogue.
         MipsReg[] regs = getRegs(iri, owner);
+        Integer[] imms = getImms(iri, owner);
         if (regs.length == 1) {
             owner.instrs.add(new MipsInstrMove(MipsReg.V0, regs[0]));
             owner.instrs.add(
                 new MipsInstrJumpLabel(MipsLabel.of(owner.name + "_epilogue"))
             );
+        } else if (imms.length == 1) {
+            owner.instrs.add(new MipsInstrMove(MipsReg.V0, MipsImmOp.of(imms[0])));
         } else {
+            IRPrinter printer = new IRPrinter(System.err);
+            printer.printInstruction(iri);
+            System.err.println("# of regs found in instruction: " + regs.length);
+            System.err.printf("operand 0: %s\n", iri.operands[0]);
+            System.err.printf("operand 1: %s\n", iri.operands[1]);
             throw new RuntimeException("Unexpected operands");
         }
     }
