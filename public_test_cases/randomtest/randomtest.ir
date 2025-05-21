@@ -10,5 +10,23 @@ loop0:
     call, puti, y
     call, putc, 10
     brneq, loop0, x, 100
+    call, mystery, A
+end:
+#end_function
+
+#start_function
+void mystery(int[100] A):
+int-list: x, y
+float-list:
+    assign, y, 5
+    assign, x, 64
+    assign, A, x, y
+    assign, x, 0
+loop0:
+    array_load, y, A, x
+    add, x, x, 1
+    call, puti, y
+    call, putc, 10
+    brneq, loop0, x, 64
 end:
 #end_function
