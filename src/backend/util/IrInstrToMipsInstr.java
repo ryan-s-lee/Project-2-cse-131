@@ -143,9 +143,14 @@ public class IrInstrToMipsInstr {
         // # If array is a pointer:
         // move $temp, $array
         // # else if array is an actual array:
-        // lui $temp, $temp, $arrayUpper
-        // or $temp, $temp, $arrayLower
-        throw new UnsupportedOperationException("Unimplemented method 'tAssignArr'");
+        // li $temp, arrayImm
+        // create a fake node
+
+        MipsReg[] regs = getRegs(iri, owner);
+        Integer[] imms = getImms(iri, owner);
+
+        MipsReg dest = regs[0]; // always expect there to be one destination register at the front
+
     }
 
 	private static void tArith(
